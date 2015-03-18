@@ -1,0 +1,6 @@
+name = Entityreference Track
+description = A module to track where entities are referenced
+
+core = 7.x
+package = "fields"
+dependencies[] = entity
