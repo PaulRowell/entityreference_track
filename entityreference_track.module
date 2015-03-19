@@ -6,3 +6,133 @@
  * @authors
  * Paul Rowell
  */
+
+/**
+ * Implements hook_menu
+ */
+function entityreference_track_menu() {
+  // @TODO verify bean module is installed
+  $items['block/%bean_delta/ent-track'] = array(
+    'title' => 'Track usage',
+    'page callback' => 'entityreference_track_block',
+    'page arguments' => array(1),
+    'access arguments' => array('view bean usage'),
+    'type' => MENU_LOCAL_TASK
+  );
+  return $items;
+}
+
+/**
+ * Implements hook_permissions().
+ */
+function entityreference_track_permission() {
+  $permissions = array(
+    'view bean usage' => array(
+      'title' => t('View Bean usage'),
+      'description' => t('View information on bean usuage via entityreference fields.'),
+    ),
+  );
+
+
+  return $permissions;
+}
+
+function entityreference_track_block($bean) {
+  // Get the block id needed
+  $bid = $bean->bid;
+
+  // Query to get linked entities
+  $fields = entityreference_track_get_fields('entityreference');
+
+  // Loop query
+  foreach ($fields as $field) {
+    $query = db_select('field_data_' . $field, 'f');
+
+    $query->fields('f', array())
+        ->condition('f.' . $field . '_target_id', $bid, '=');
+    $results[$field] = $query->execute()
+        ->fetchAll();
+  }
+  // Then place in a table
+  $headers = array(
+    'entity' => array('data' => t('Entity')),
+    'type' => array('data' => t('Type')),
+    'field' => array('data' => t('Field')),
+    'title' => array('data' => t('Title')),
+    'operations' => array('data' => t('')),
+  );
+
+  $rows = array();
+  foreach ($results as $field => $result) {
+    if (!empty($result)) {
+
+      // Get field label
+      $entity_type = $result[0]->entity_type;
+      $bundle_name = $result[0]->bundle;
+
+      $info = field_info_instance($entity_type, $field, $bundle_name);
+
+      // @TODO Get bundle label
+
+      foreach ($result as $r) {
+        // Get view/edit links
+        $edit_link = $r->entity_type . '/' . $r->entity_id . '/edit';
+
+        // Node title
+        // @TODO always going to be a node?
+        $title = entityreference_track_get_node_title($r->entity_id);
+
+        $rows[] = array(
+          'entity' => $r->entity_type,
+          'type' => $r->bundle,
+          'field' => $info['label'],
+          'title' => l($title, 'node/' . $r->entity_id),
+          'operations' => drupal_valid_path($edit_link) ? l('edit', $edit_link) : NULL,
+        );
+      }
+    }
+  }
+
+  $variables['headers'] = $headers;
+  $variables['rows'] = $rows;
+
+  // Set title
+  drupal_set_title(t('Track @type: @title', array('@type' => $type['label'], '@title' => $bean->label)), PASS_THROUGH);
+
+  // Return table
+  $output = theme('table', array('header' => $headers, 'rows' => $rows));
+  return $output;
+}
+
+/**
+ * Implements hook_admin_paths().
+ */
+function entityreference_track_admin_paths() {
+  $paths = array(
+    'block/*/ent-track' => TRUE,
+  );
+  return $paths;
+}
+
+/**
+ * Function to get all fields of type $field_type
+ * @return type
+ */
+function entityreference_track_get_fields($field_type) {
+
+  $query = db_select('field_config', 'fc');
+
+  $query->fields('fc', array('field_name'))
+      ->condition('fc.type', $field_type, '=');
+  $result = $query->execute()
+      ->fetchCol();
+
+  return $result;
+}
+
+/**
+ * Helper function to get the node title without loading the whole node object.
+ */
+function entityreference_track_get_node_title($nid) {
+  return db_query('SELECT title FROM {node} WHERE nid = :nid', array(':nid' => $nid))->fetchField();
+}
