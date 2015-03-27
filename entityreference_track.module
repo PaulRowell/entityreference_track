@@ -72,7 +72,6 @@ function entityreference_track_block($bean) {
 
       $info = field_info_instance($entity_type, $field, $bundle_name);
 
-      // @TODO Get bundle label
 
       foreach ($result as $r) {
         // Get view/edit links
@@ -82,12 +81,15 @@ function entityreference_track_block($bean) {
         // @TODO always going to be a node?
         $title = entityreference_track_get_node_title($r->entity_id);
 
+        // Bundle label
+        $bundle_label = entityreference_track_get_entity_label('node', $r->bundle);
+
         $rows[] = array(
           'entity' => $r->entity_type,
-          'type' => $r->bundle,
+          'type' => $bundle_label,
           'field' => $info['label'],
           'title' => l($title, 'node/' . $r->entity_id),
-          'operations' => drupal_valid_path($edit_link) ? l('edit', $edit_link) : NULL,
+          'operations' => drupal_valid_path($edit_link) ? l('edit ' . $entity_type, $edit_link) : NULL,
         );
       }
     }
@@ -135,4 +137,20 @@ function entityreference_track_get_fields($field_type) {
  */
 function entityreference_track_get_node_title($nid) {
   return db_query('SELECT title FROM {node} WHERE nid = :nid', array(':nid' => $nid))->fetchField();
+}
+
+/**
+ * Function to get the label of an entity
+ * @param string $type
+ * @param string $name
+ */
+function entityreference_track_get_entity_label($type, $name){
+  // Get the info
+  $entity_info = entity_get_info($type);
+  
+  // Find our label
+  // @TODO failchecks
+  $label = $entity_info['bundles'][$name]['label'];
+  
+  return $label;
 }
